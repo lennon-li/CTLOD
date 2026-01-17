@@ -227,6 +227,386 @@ get_sd_summary <- function(mod1, mod2) {
   rbind(df_dil, df_comp, df_anova)
 }
 
+## ---------- Diagnostic 2×2 helper + module -----------------------
+
+diag_prop_ci <- function(x, n, conf.level = 0.95) {
+  if (is.na(x) || is.na(n) || n <= 0) {
+    return(c(Estimate = NA_real_, Lower = NA_real_, Upper = NA_real_))
+  }
+  bt <- binom.test(round(x), round(n), conf.level = conf.level)
+  c(
+    Estimate = unname(bt$estimate),
+    Lower    = bt$conf.int[1],
+    Upper    = bt$conf.int[2]
+  )
+}
+
+diag2x2UI <- function(id) {
+  ns <- NS(id)
+  
+  tabsetPanel(
+    type = "pills",
+    id   = ns("diag_tabs"),
+    
+    tabPanel(
+      "Calculator",
+      h3("Diagnostic Test 2×2 Calculator"),
+      fluidRow(
+        column(
+          width = 5,
+          tags$h4("Enter 2×2 table"),
+          tags$table(
+            class = "table table-bordered table-sm diag-input-table",
+            tags$thead(
+              tags$tr(
+                tags$th(""),
+                tags$th(colspan = 2, "Condition"),
+                tags$th("Totals")
+              ),
+              tags$tr(
+                tags$th(""),
+                tags$th("Absent"),
+                tags$th("Present"),
+                tags$th("")
+              )
+            ),
+            tags$tbody(
+              tags$tr(
+                tags$th("Test Positive"),
+                tags$td(
+                  numericInput(
+                    ns("fp"), NULL,
+                    value = 0, min = 0, step = 1
+                  )
+                ),
+                tags$td(
+                  numericInput(
+                    ns("tp"), NULL,
+                    value = 23, min = 0, step = 1
+                  )
+                ),
+                tags$td(textOutput(ns("row_pos_tot")))
+              ),
+              tags$tr(
+                tags$th("Test Negative"),
+                tags$td(
+                  numericInput(
+                    ns("tn"), NULL,
+                    value = 92, min = 0, step = 1
+                  )
+                ),
+                tags$td(
+                  numericInput(
+                    ns("fn"), NULL,
+                    value = 1, min = 0, step = 1
+                  )
+                ),
+                tags$td(textOutput(ns("row_neg_tot")))
+              ),
+              tags$tr(
+                tags$th("Totals"),
+                tags$td(textOutput(ns("col_abs_tot"))),
+                tags$td(textOutput(ns("col_pres_tot"))),
+                tags$td(textOutput(ns("grand_tot")))
+              )
+            )
+          ),
+          div(
+            style = "margin-top: 10px;",
+            actionButton(ns("calc"), "Calculate", class = "btn btn-primary"),
+            actionButton(ns("reset"), "Reset", class = "btn btn-secondary")
+          ),
+          div(
+            style = "margin-top: 8px; max-width: 220px;",
+            numericInput(
+              ns("digits"),
+              label = "Digits to display:",
+              value = 6,
+              min   = 1,
+              max   = 10
+            )
+          ),
+          tags$small(
+            class = "text-muted",
+            "Cells: TP = Test positive & Condition present; ",
+            "TN = Test negative & Condition absent; ",
+            "FP = Test positive & Condition absent; ",
+            "FN = Test negative & Condition present."
+          )
+        ),
+        
+        column(
+          width = 7,
+          h4("Summary"),
+          br(),
+          h5("Prevalence, sensitivity, specificity"),
+          tableOutput(ns("tbl_main")),
+          br(),
+          h5("Overall probability that the test result will be:"),
+          tableOutput(ns("tbl_test_result")),
+          br(),
+          h5("For a positive test result, probability that it is:"),
+          tableOutput(ns("tbl_pos_result")),
+          br(),
+          h5("For a negative test result, probability that it is:"),
+          tableOutput(ns("tbl_neg_result")),
+          br(),
+          h5("Likelihood Ratios"),
+          tableOutput(ns("tbl_lr"))
+        )
+      )
+    ),
+    
+    tabPanel(
+      "About",
+      br(),
+      fluidRow(
+        column(
+          10,
+          h3("About the Diagnostic 2×2 Calculator"),
+          p(
+            "This tab reproduces the core logic of a classical 2×2 diagnostic test calculator. ",
+            "You enter counts of true positives (TP), false positives (FP), true negatives (TN), ",
+            "and false negatives (FN). The app then derives standard diagnostic performance measures ",
+            "with exact binomial confidence intervals."
+          ),
+          h4("Quantities computed"),
+          tags$ul(
+            tags$li(
+              strong("Prevalence: "),
+              "proportion of subjects truly having the condition ",
+              "( (TP + FN) / N )."
+            ),
+            tags$li(
+              strong("Sensitivity: "),
+              "probability the test is positive among those with the condition ",
+              "( TP / (TP + FN) )."
+            ),
+            tags$li(
+              strong("Specificity: "),
+              "probability the test is negative among those without the condition ",
+              "( TN / (TN + FP) )."
+            ),
+            tags$li(
+              strong("Positive predictive value (PPV): "),
+              "probability the condition is present given a positive result ",
+              "( TP / (TP + FP) )."
+            ),
+            tags$li(
+              strong("Negative predictive value (NPV): "),
+              "probability the condition is absent given a negative result ",
+              "( TN / (TN + FN) )."
+            ),
+            tags$li(
+              strong("Likelihood ratios: "),
+              "we report both conventional likelihood ratios (based only on sensitivity and specificity) ",
+              "and prevalence-weighted odds ratios, which incorporate the underlying prevalence."
+            )
+          ),
+          p(
+            "Proportions and confidence intervals are based on the exact binomial test ",
+            "(via ",
+            code("binom.test"),
+            " in R), mirroring the style of established clinical calculators."
+          ),
+          h4("Reference / original calculator"),
+          p(
+            "This module is conceptually aligned with the well-known VassarStats 2×2 diagnostic test calculator:"
+          ),
+          tags$p(
+            tags$a(
+              href   = "http://www.vassarstats.net/clin1.html",
+              target = "_blank",
+              "VassarStats: Diagnostic Test Calculator (2×2 table)"
+            )
+          ),
+          p(
+            "The Shiny implementation here is not an exact clone, but it computes the same core quantities ",
+            "and presents them in a similar structured layout for routine assay validation and method comparison."
+          )
+        )
+      )
+    )
+  )
+}
+
+diag2x2Server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    
+    totals <- reactive({
+      tp <- as.numeric(input$tp); fp <- as.numeric(input$fp)
+      fn <- as.numeric(input$fn); tn <- as.numeric(input$tn)
+      list(
+        tp = tp, fp = fp, fn = fn, tn = tn,
+        row_pos  = tp + fp,
+        row_neg  = fn + tn,
+        col_abs  = fp + tn,
+        col_pres = tp + fn,
+        grand    = tp + fp + fn + tn
+      )
+    })
+    
+    output$row_pos_tot  <- renderText(totals()$row_pos)
+    output$row_neg_tot  <- renderText(totals()$row_neg)
+    output$col_abs_tot  <- renderText(totals()$col_abs)
+    output$col_pres_tot <- renderText(totals()$col_pres)
+    output$grand_tot    <- renderText(totals()$grand)
+    
+    observeEvent(input$reset, {
+      updateNumericInput(session, "fp", value = 0)
+      updateNumericInput(session, "tp", value = 23)
+      updateNumericInput(session, "tn", value = 92)
+      updateNumericInput(session, "fn", value = 1)
+    })
+    
+    stats_list <- eventReactive(input$calc, ignoreNULL = FALSE, {
+      tt  <- totals()
+      tp  <- tt$tp; fp <- tt$fp; fn <- tt$fn; tn <- tt$tn
+      N   <- tt$grand
+      
+      if (N <= 0) return(NULL)
+      
+      prev   <- diag_prop_ci(tp + fn, N)
+      sens   <- diag_prop_ci(tp, tp + fn)
+      spec   <- diag_prop_ci(tn, tn + fp)
+      
+      p_pos  <- diag_prop_ci(tp + fp, N)
+      p_neg  <- diag_prop_ci(tn + fn, N)
+      
+      ppv    <- if (tp + fp > 0) diag_prop_ci(tp, tp + fp) else rep(NA, 3)
+      fpv    <- if (tp + fp > 0) diag_prop_ci(fp, tp + fp) else rep(NA, 3)
+      npv    <- if (tn + fn > 0) diag_prop_ci(tn, tn + fn) else rep(NA, 3)
+      fnv    <- if (tn + fn > 0) diag_prop_ci(fn, tn + fn) else rep(NA, 3)
+      
+      Se       <- sens["Estimate"]
+      Sp       <- spec["Estimate"]
+      prev_est <- prev["Estimate"]
+      
+      lr_pos_c_est <- if (!is.na(Se) && !is.na(Sp) && Sp < 1) Se / (1 - Sp) else Inf
+      lr_neg_c_est <- if (!is.na(Se) && !is.na(Sp) && Sp > 0) (1 - Se) / Sp else NA_real_
+      
+      SeL <- sens["Lower"]; SeU <- sens["Upper"]
+      SpL <- spec["Lower"]; SpU <- spec["Upper"]
+      
+      lr_pos_c_ci <- c(NA, NA)
+      lr_neg_c_ci <- c(NA, NA)
+      
+      if (!is.na(SeL) && !is.na(SeU) && !is.na(SpL) && !is.na(SpU) && SpU < 1) {
+        lr_pos_c_lo <- SeL / (1 - SpU)
+        lr_pos_c_hi <- SeU / (1 - SpL)
+        lr_pos_c_ci <- c(lr_pos_c_lo, lr_pos_c_hi)
+      }
+      
+      if (!is.na(SeL) && !is.na(SeU) && !is.na(SpL) && !is.na(SpU) && SpL > 0) {
+        lr_neg_c_lo <- (1 - SeU) / SpU
+        lr_neg_c_hi <- (1 - SeL) / SpL
+        lr_neg_c_ci <- c(lr_neg_c_lo, lr_neg_c_hi)
+      }
+      
+      odds_prev <- if (!is.na(prev_est) && prev_est > 0 && prev_est < 1) {
+        prev_est / (1 - prev_est)
+      } else NA_real_
+      
+      lr_pos_w_est <- if (is.finite(lr_pos_c_est) && !is.na(odds_prev)) {
+        lr_pos_c_est * odds_prev
+      } else NA_real_
+      lr_neg_w_est <- if (!is.na(lr_neg_c_est) && !is.na(odds_prev)) {
+        lr_neg_c_est * odds_prev
+      } else NA_real_
+      
+      lr_pos_w_ci <- if (!any(is.na(c(lr_pos_c_ci, odds_prev)))) lr_pos_c_ci * odds_prev else c(NA, NA)
+      lr_neg_w_ci <- if (!any(is.na(c(lr_neg_c_ci, odds_prev)))) lr_neg_c_ci * odds_prev else c(NA, NA)
+      
+      list(
+        N     = N,
+        prev  = prev,
+        sens  = sens,
+        spec  = spec,
+        p_pos = p_pos,
+        p_neg = p_neg,
+        ppv   = ppv,
+        fpv   = fpv,
+        npv   = npv,
+        fnv   = fnv,
+        lr_pos_c = c(Estimate = lr_pos_c_est, Lower = lr_pos_c_ci[1], Upper = lr_pos_c_ci[2]),
+        lr_neg_c = c(Estimate = lr_neg_c_est, Lower = lr_neg_c_ci[1], Upper = lr_neg_c_ci[2]),
+        lr_pos_w = c(Estimate = lr_pos_w_est, Lower = lr_pos_w_ci[1], Upper = lr_pos_w_ci[2]),
+        lr_neg_w = c(Estimate = lr_neg_w_est, Lower = lr_neg_w_ci[1], Upper = lr_neg_w_ci[2])
+      )
+    })
+    
+    # format as character to avoid renderTable rounding to 2 digits
+    fmt_tbl <- function(x, digits = 6) {
+      if (is.null(x)) return(NULL)
+      df <- as.data.frame(x)
+      rn <- rownames(df)
+      df[] <- lapply(df, function(col) {
+        if (is.numeric(col)) {
+          formatC(col, digits = digits, format = "g")
+        } else {
+          as.character(col)
+        }
+      })
+      rownames(df) <- rn
+      df
+    }
+    
+    output$tbl_main <- renderTable({
+      s <- stats_list(); if (is.null(s)) return(NULL)
+      digs <- if (!is.null(input$digits)) input$digits else 6
+      df <- rbind(
+        Prevalence  = s$prev,
+        Sensitivity = s$sens,
+        Specificity = s$spec
+      )
+      fmt_tbl(df, digits = digs)
+    }, rownames = TRUE)
+    
+    output$tbl_test_result <- renderTable({
+      s <- stats_list(); if (is.null(s)) return(NULL)
+      digs <- if (!is.null(input$digits)) input$digits else 6
+      df <- rbind(
+        `Positive` = s$p_pos,
+        `Negative` = s$p_neg
+      )
+      fmt_tbl(df, digits = digs)
+    }, rownames = TRUE)
+    
+    output$tbl_pos_result <- renderTable({
+      s <- stats_list(); if (is.null(s)) return(NULL)
+      digs <- if (!is.null(input$digits)) input$digits else 6
+      df <- rbind(
+        `True Positive (PPV)` = s$ppv,
+        `False Positive`      = s$fpv
+      )
+      fmt_tbl(df, digits = digs)
+    }, rownames = TRUE)
+    
+    output$tbl_neg_result <- renderTable({
+      s <- stats_list(); if (is.null(s)) return(NULL)
+      digs <- if (!is.null(input$digits)) input$digits else 6
+      df <- rbind(
+        `True Negative (NPV)` = s$npv,
+        `False Negative`      = s$fnv
+      )
+      fmt_tbl(df, digits = digs)
+    }, rownames = TRUE)
+    
+    output$tbl_lr <- renderTable({
+      s <- stats_list(); if (is.null(s)) return(NULL)
+      digs <- if (!is.null(input$digits)) input$digits else 6
+      df <- rbind(
+        `Positive [C]` = s$lr_pos_c,
+        `Negative [C]` = s$lr_neg_c,
+        `Positive [W]` = s$lr_pos_w,
+        `Negative [W]` = s$lr_neg_w
+      )
+      fmt_tbl(df, digits = digs)
+    }, rownames = TRUE)
+  })
+}
+
 ## ---------- Ct regression module -----------------------
 
 ctAppUI <- function(id) {
@@ -318,7 +698,7 @@ ctAppUI <- function(id) {
                 tags$ul(
                   tags$li(
                     strong("Fixed effect of dilution: "),
-                    "captures how the mean Ct changes with dilution."
+                    "captures how the mean Ct changes with dilution across all experiments."
                   ),
                   tags$li(
                     strong("Random intercept for exp: "),
@@ -1157,7 +1537,11 @@ ui <- fluidPage(
         background-color: #020617;
       }
 
-      /* Top-level tabset (main navigation) */
+      .diag-input-table th, .diag-input-table td {
+        text-align: center;
+        vertical-align: middle;
+      }
+
       #main_tabs .nav-pills > li > a {
         background-color: #020617;
         color: #9CA3AF;
@@ -1173,11 +1557,10 @@ ui <- fluidPage(
       #main_tabs .nav-pills > li.active > a:focus,
       #main_tabs .nav-pills > li.active > a:hover {
         background-color: #111827;
-        color: #FBBF24; /* gold label text */
+        color: #FBBF24;
         border-color: #FBBF24;
       }
 
-      /* Ct module side panel (blue accent) */
       .ct-panel .well {
         border-left: 5px solid #3B82F6;
         background-color: #020617;
@@ -1191,7 +1574,6 @@ ui <- fluidPage(
         margin-top: 0;
       }
 
-      /* Ct inner tabs */
       #ct-ct_tabs .nav-pills > li > a {
         background-color: #020617;
         color: #9CA3AF;
@@ -1211,7 +1593,6 @@ ui <- fluidPage(
         border-color: #60A5FA;
       }
 
-      /* LOD module side panel (orange accent) */
       .lod-panel .well {
         border-left: 5px solid #F97316;
         background-color: #020617;
@@ -1225,7 +1606,6 @@ ui <- fluidPage(
         margin-top: 0;
       }
 
-      /* LOD inner tabs */
       #lod-lod_tabs .nav-pills > li > a {
         background-color: #020617;
         color: #9CA3AF;
@@ -1251,7 +1631,6 @@ ui <- fluidPage(
         color: #E5E7EB;
       }
 
-      /* Hero cards */
       .hero-card {
         border-radius: 12px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.7);
@@ -1272,7 +1651,6 @@ ui <- fluidPage(
         color: #9CA3AF;
       }
 
-      /* DataTables dark adjustment */
       table.dataTable {
         color: #E5E7EB !important;
       }
@@ -1288,18 +1666,15 @@ ui <- fluidPage(
   
   titlePanel(
     div(
-      style = "display:flex; align-items:center; justify-content:space-between; gap:20px;",
-      div(
-        style = "display:flex; align-items:center; gap:20px;",
-        img(
-          src   = "PHO.png",
-          height = 96,
-          width  = 288,
-          style  = "flex-shrink:0; margin-right:10px;"
-        ),
-        h2("Ct Precision & LOD Tool",
-           style = "margin-bottom:0; font-weight:600; color:#F9FAFB;")
-      )
+      style = "display:flex; align-items:center; gap:20px;",
+      img(
+        src   = "PHO.png",
+        height = 96,
+        width  = 288,
+        style  = "flex-shrink:0; margin-right:10px;"
+      ),
+      h2("Ct Precision & LOD Tool",
+         style = "margin-bottom:0; font-weight:600; color:#F9FAFB;")
     ),
     windowTitle = "Ct Precision & LOD Tool"
   ),
@@ -1311,7 +1686,7 @@ ui <- fluidPage(
   br(),
   fluidRow(
     column(
-      6,
+      4,
       wellPanel(
         class = "hero-card",
         h4(
@@ -1325,7 +1700,7 @@ ui <- fluidPage(
       )
     ),
     column(
-      6,
+      4,
       wellPanel(
         class = "hero-card",
         h4(
@@ -1337,28 +1712,46 @@ ui <- fluidPage(
           "estimate LOD at chosen detection probabilities on both dilution and copy-number scales."
         )
       )
+    ),
+    column(
+      4,
+      wellPanel(
+        class = "hero-card",
+        h4(
+          span(icon("table", class = "hero-icon")),
+          "Diagnostic 2×2"
+        ),
+        p(
+          "Summarize 2×2 diagnostic test data (TP, FP, TN, FN); ",
+          "compute prevalence, sensitivity, specificity, predictive values, and likelihood ratios ",
+          "with exact binomial confidence intervals."
+        )
+      )
     )
   ),
   br(),
+  
   
   tabsetPanel(
     type = "pills",
     id   = "main_tabs",
     tabPanel("Ct Precision (continuous)", ctAppUI("ct")),
-    tabPanel("LOD Estimation (binary)", lodAppUI("lod"))
+    tabPanel("LOD Estimation (binary)",   lodAppUI("lod")),
+    tabPanel("Diagnostic 2×2",            diag2x2UI("diag2"))
   ),
   
   tags$hr(style="border-color:#1F2937;"),
   div(
     style = "font-size:0.85em; color:#6B7280; text-align:right; margin-top:5px;",
     "Version 1.0 • For questions, contact: ",
-    tags$a("Lennon Li", href = "mailto:lennon.li@oahpp.ca")
+    tags$a("lennon.li@oahpp.ca", href = "mailto:lennon.li@oahpp.ca")
   )
 )
 
 server <- function(input, output, session) {
   ctAppServer("ct")
   lodAppServer("lod")
+  diag2x2Server("diag2")
 }
 
 shinyApp(ui, server)

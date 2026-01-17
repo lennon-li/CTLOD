@@ -1667,12 +1667,12 @@ ui <- fluidPage(
   titlePanel(
     div(
       style = "display:flex; align-items:center; gap:20px;",
-      img(
-        src   = "PHO.png",
-        height = 96,
-        width  = 288,
-        style  = "flex-shrink:0; margin-right:10px;"
-      ),
+      # img(
+      #   src   = "PHO.png",
+      #   height = 96,
+      #   width  = 288,
+      #   style  = "flex-shrink:0; margin-right:10px;"
+      # ),
       h2("Ct Precision & LOD Tool",
          style = "margin-bottom:0; font-weight:600; color:#F9FAFB;")
     ),
@@ -1744,7 +1744,7 @@ ui <- fluidPage(
   div(
     style = "font-size:0.85em; color:#6B7280; text-align:right; margin-top:5px;",
     "Version 1.0 • For questions, contact: ",
-    tags$a("lennon.li@oahpp.ca", href = "mailto:lennon.li@oahpp.ca")
+    tags$a("Lennon Li", href = "mailto:lennon.li@oahpp.ca")
   )
 )
 

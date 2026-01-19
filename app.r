@@ -12,8 +12,8 @@ library(rlang)
 library(glmmTMB)
 library(dplyr)
 library(tidyr)
-library(officer)
-library(flextable)
+library(rmarkdown)
+library(knitr)
 
 brglmControl(maxit = 5000)
 
@@ -458,9 +458,9 @@ diag2x2Server <- function(id) {
     
     observeEvent(input$reset, {
       updateNumericInput(session, "fp", value = 0)
-      updateNumericInput(session, "tp", value = 0)
-      updateNumericInput(session, "tn", value = 0)
-      updateNumericInput(session, "fn", value = 0)
+      updateNumericInput(session, "tp", value = 23)
+      updateNumericInput(session, "tn", value = 92)
+      updateNumericInput(session, "fn", value = 1)
     })
     
     stats_list <- eventReactive(input$calc, ignoreNULL = FALSE, {
@@ -619,8 +619,8 @@ diag2x2Server <- function(id) {
           stop("No results to export yet — click Calculate first.")
         }
         
-        if (!requireNamespace("officer", quietly = TRUE) || !requireNamespace("flextable", quietly = TRUE)) {
-          stop("To export DOCX, please install packages: officer and flextable.")
+        if (!requireNamespace("rmarkdown", quietly = TRUE) || !requireNamespace("knitr", quietly = TRUE)) {
+          stop("To export DOCX on Posit Cloud, please install packages: rmarkdown and knitr.")
         }
         
         digs <- if (!is.null(input$digits)) input$digits else 6
@@ -662,31 +662,62 @@ diag2x2Server <- function(id) {
         
         tt <- totals()
         
-        doc <- officer::read_docx()
-        doc <- officer::body_add_par(doc, "Diagnostic 2×2 summary", style = "heading 1")
-        doc <- officer::body_add_par(
-          doc,
+        # Render a tiny Rmd to Word using Pandoc (more Posit-Cloud friendly than officer)
+        rmd <- tempfile(fileext = ".Rmd")
+        out_dir <- tempdir()
+        out_name <- paste0("diagnostic2x2_summary_", Sys.Date(), ".docx")
+        
+        writeLines(c(
+          "---",
+          "title: 'Diagnostic 2×2 summary'",
+          "output: word_document",
+          "---",
+          "",
           sprintf("TP=%s, FP=%s, TN=%s, FN=%s (N=%s)", tt$tp, tt$fp, tt$tn, tt$fn, tt$grand),
-          style = "Normal"
+          "",
+          sprintf("Digits shown: %s", digs),
+          "",
+          "## Prevalence, sensitivity, specificity",
+          "```{r, echo=FALSE}",
+          "knitr::kable(df_main)",
+          "```",
+          "",
+          "## Overall probability that the test result will be",
+          "```{r, echo=FALSE}",
+          "knitr::kable(df_test_result)",
+          "```",
+          "",
+          "## For a positive test result, probability that it is",
+          "```{r, echo=FALSE}",
+          "knitr::kable(df_pos_result)",
+          "```",
+          "",
+          "## For a negative test result, probability that it is",
+          "```{r, echo=FALSE}",
+          "knitr::kable(df_neg_result)",
+          "```",
+          "",
+          "## Likelihood ratios",
+          "```{r, echo=FALSE}",
+          "knitr::kable(df_lr)",
+          "```"
+        ), con = rmd)
+        
+        rmarkdown::render(
+          input        = rmd,
+          output_file  = out_name,
+          output_dir   = out_dir,
+          quiet        = TRUE,
+          envir        = list2env(list(
+            df_main        = df_main,
+            df_test_result = df_test_result,
+            df_pos_result  = df_pos_result,
+            df_neg_result  = df_neg_result,
+            df_lr          = df_lr
+          ), parent = globalenv())
         )
-        doc <- officer::body_add_par(doc, sprintf("Digits shown: %s", digs), style = "Normal")
-        doc <- officer::body_add_par(doc, "", style = "Normal")
         
-        add_tbl <- function(doc, title, df) {
-          doc <- officer::body_add_par(doc, title, style = "heading 2")
-          ft  <- flextable::flextable(df)
-          ft  <- flextable::autofit(ft)
-          doc <- flextable::body_add_flextable(doc, ft)
-          officer::body_add_par(doc, "", style = "Normal")
-        }
-        
-        doc <- add_tbl(doc, "Prevalence, sensitivity, specificity", df_main)
-        doc <- add_tbl(doc, "Overall probability that the test result will be", df_test_result)
-        doc <- add_tbl(doc, "For a positive test result, probability that it is", df_pos_result)
-        doc <- add_tbl(doc, "For a negative test result, probability that it is", df_neg_result)
-        doc <- add_tbl(doc, "Likelihood ratios", df_lr)
-        
-        print(doc, target = file)
+        file.copy(file.path(out_dir, out_name), file, overwrite = TRUE)
       }
     )
   })

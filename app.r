@@ -282,7 +282,7 @@ diag2x2UI <- function(id) {
                 tags$td(
                   numericInput(
                     ns("tp"), NULL,
-                    value = 23, min = 0, step = 1
+                    value = 0, min = 0, step = 1
                   )
                 ),
                 tags$td(textOutput(ns("row_pos_tot")))
@@ -292,13 +292,13 @@ diag2x2UI <- function(id) {
                 tags$td(
                   numericInput(
                     ns("tn"), NULL,
-                    value = 92, min = 0, step = 1
+                    value = 0, min = 0, step = 1
                   )
                 ),
                 tags$td(
                   numericInput(
                     ns("fn"), NULL,
-                    value = 1, min = 0, step = 1
+                    value = 0, min = 0, step = 1
                   )
                 ),
                 tags$td(textOutput(ns("row_neg_tot")))
@@ -312,9 +312,10 @@ diag2x2UI <- function(id) {
             )
           ),
           div(
-            style = "margin-top: 10px;",
+            style = "margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;",
             actionButton(ns("calc"), "Calculate", class = "btn btn-primary"),
-            actionButton(ns("reset"), "Reset", class = "btn btn-secondary")
+            actionButton(ns("reset"), "Reset", class = "btn btn-secondary"),
+            downloadButton(ns("download_docx"), "Download DOCX", class = "btn btn-success")
           ),
           div(
             style = "margin-top: 8px; max-width: 220px;",
@@ -455,9 +456,9 @@ diag2x2Server <- function(id) {
     
     observeEvent(input$reset, {
       updateNumericInput(session, "fp", value = 0)
-      updateNumericInput(session, "tp", value = 23)
-      updateNumericInput(session, "tn", value = 92)
-      updateNumericInput(session, "fn", value = 1)
+      updateNumericInput(session, "tp", value = 0)
+      updateNumericInput(session, "tn", value = 0)
+      updateNumericInput(session, "fn", value = 0)
     })
     
     stats_list <- eventReactive(input$calc, ignoreNULL = FALSE, {
@@ -604,6 +605,88 @@ diag2x2Server <- function(id) {
       )
       fmt_tbl(df, digits = digs)
     }, rownames = TRUE)
+    
+    
+    output$download_docx <- downloadHandler(
+      filename = function() {
+        paste0("diagnostic2x2_summary_", Sys.Date(), ".docx")
+      },
+      content = function(file) {
+        s <- stats_list()
+        if (is.null(s)) {
+          stop("No results to export yet — click Calculate first.")
+        }
+        
+        if (!requireNamespace("officer", quietly = TRUE) || !requireNamespace("flextable", quietly = TRUE)) {
+          stop("To export DOCX, please install packages: officer and flextable.")
+        }
+        
+        digs <- if (!is.null(input$digits)) input$digits else 6
+        
+        prep_df <- function(df) {
+          df2 <- fmt_tbl(df, digits = digs)
+          df2 <- cbind(Measure = rownames(df2), df2)
+          rownames(df2) <- NULL
+          df2
+        }
+        
+        df_main <- prep_df(rbind(
+          Prevalence  = s$prev,
+          Sensitivity = s$sens,
+          Specificity = s$spec
+        ))
+        
+        df_test_result <- prep_df(rbind(
+          Positive = s$p_pos,
+          Negative = s$p_neg
+        ))
+        
+        df_pos_result <- prep_df(rbind(
+          `True Positive (PPV)` = s$ppv,
+          `False Positive`      = s$fpv
+        ))
+        
+        df_neg_result <- prep_df(rbind(
+          `True Negative (NPV)` = s$npv,
+          `False Negative`      = s$fnv
+        ))
+        
+        df_lr <- prep_df(rbind(
+          `Positive [C]` = s$lr_pos_c,
+          `Negative [C]` = s$lr_neg_c,
+          `Positive [W]` = s$lr_pos_w,
+          `Negative [W]` = s$lr_neg_w
+        ))
+        
+        tt <- totals()
+        
+        doc <- officer::read_docx()
+        doc <- officer::body_add_par(doc, "Diagnostic 2×2 summary", style = "heading 1")
+        doc <- officer::body_add_par(
+          doc,
+          sprintf("TP=%s, FP=%s, TN=%s, FN=%s (N=%s)", tt$tp, tt$fp, tt$tn, tt$fn, tt$grand),
+          style = "Normal"
+        )
+        doc <- officer::body_add_par(doc, sprintf("Digits shown: %s", digs), style = "Normal")
+        doc <- officer::body_add_par(doc, "", style = "Normal")
+        
+        add_tbl <- function(doc, title, df) {
+          doc <- officer::body_add_par(doc, title, style = "heading 2")
+          ft  <- flextable::flextable(df)
+          ft  <- flextable::autofit(ft)
+          doc <- flextable::body_add_flextable(doc, ft)
+          officer::body_add_par(doc, "", style = "Normal")
+        }
+        
+        doc <- add_tbl(doc, "Prevalence, sensitivity, specificity", df_main)
+        doc <- add_tbl(doc, "Overall probability that the test result will be", df_test_result)
+        doc <- add_tbl(doc, "For a positive test result, probability that it is", df_pos_result)
+        doc <- add_tbl(doc, "For a negative test result, probability that it is", df_neg_result)
+        doc <- add_tbl(doc, "Likelihood ratios", df_lr)
+        
+        print(doc, target = file)
+      }
+    )
   })
 }
 
@@ -1808,7 +1891,7 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
         color: #9CA3AF !important;
       }
   ")),
-
+    
     tags$script(HTML("  (function(){    function setActive(id){      $('#hero_ct, #hero_lod, #hero_diag2').removeClass('active');      $(id).addClass('active');    }    $(document).on('click', '#hero_ct', function(){      setActive('#hero_ct');      Shiny.setInputValue('app_choice', 'ct', {priority: 'event'});    });    $(document).on('click', '#hero_lod', function(){      setActive('#hero_lod');      Shiny.setInputValue('app_choice', 'lod', {priority: 'event'});    });    $(document).on('click', '#hero_diag2', function(){      setActive('#hero_diag2');      Shiny.setInputValue('app_choice', 'diag2', {priority: 'event'});    });    $(document).on('shiny:connected', function(){      setActive('#hero_ct');    });  })();"))
   ),
   
@@ -1882,7 +1965,7 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
     )
   ),
   br(),
-
+  
   uiOutput("selected_app_ui"),
   
   tags$hr(style="border-color:#1F2937;"),
@@ -1895,12 +1978,12 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
 
 server <- function(input, output, session) {
   selected_app <- reactiveVal("ct")
-
+  
   observeEvent(input$app_choice, {
     req(input$app_choice)
     selected_app(as.character(input$app_choice))
   }, ignoreInit = TRUE)
-
+  
   output$selected_app_ui <- renderUI({
     switch(
       selected_app(),
@@ -1910,7 +1993,7 @@ server <- function(input, output, session) {
       ctAppUI("ct")
     )
   })
-
+  
   ctAppServer("ct")
   lodAppServer("lod")
   diag2x2Server("diag2")

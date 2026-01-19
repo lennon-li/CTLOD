@@ -13,6 +13,7 @@ library(glmmTMB)
 library(dplyr)
 library(tidyr)
 
+# Increase max iterations for brglm2 if needed
 brglmControl(maxit = 5000)
 
 ## ---------- Shared helper functions for Ct app ----------------------
@@ -1533,295 +1534,165 @@ ui <- fluidPage(
   
   tags$head(
     tags$style(HTML("
+      /* =====================================================
+         GLOBAL DARK THEME OVERRIDES
+         ===================================================== */
       body {
         background-color: #020617;
       }
-
+      
+      
       .diag-input-table th, .diag-input-table td {
         text-align: center;
         vertical-align: middle;
+        color: #E5E7EB;
       }
 
-      /* ===========================
-         TOP-LEVEL APP TABS (main_tabs)
-         Big pill buttons
-         =========================== */
-      /* ===========================
-   TOP-LEVEL APP TABS (main_tabs)
-   Big pill buttons, app-specific colors
-   =========================== */
-/* ===========================
-   TOP-LEVEL APP TABS (main_tabs)
-   Big pill buttons, app-specific colors
-   =========================== */
+      /* =====================================================
+         1. OUTER TABS (TOP LEVEL)
+         Wrapper class: .outer-navigation
+         ===================================================== */
 
-/* base style: all three top-level tabs */
-/* TOP-LEVEL APP TABS (main_tabs) */
-/* Base style for ALL three tabs */
-ul.nav[data-tabsetid='main_tabs'] > li > a {
-  background-color: #111827;   /* dark pill on dark bg */
-  color: #E5E7EB;
-  border-radius: 999px;
-  margin-right: 8px;
-  border: 1px solid #4B5563;
-  padding: 8px 22px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
+      .outer-navigation .nav-pills > li > a {
+        background-color: #1F2937 !important; /* Dark Grey base */
+        color: #9CA3AF !important;            /* Muted Text */
+        border: 1px solid #374151 !important;
+        border-radius: 50px !important;       /* Round Pill */
+        margin-right: 12px;
+        padding: 12px 30px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
 
-ul.nav[data-tabsetid='main_tabs'] > li > a:hover {
-  background-color: #1F2937;
-  color: #F9FAFB;
-  border-color: #6B7280;
-}
+      .outer-navigation .nav-pills > li > a:hover {
+        background-color: #374151 !important;
+        color: #F3F4F6 !important;
+      }
 
-/* Tab 1 active: Ct Precision (blue pill) */
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(1).active > a,
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(1).active > a:focus,
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(1).active > a:hover {
-  background-color: #2563EB;   /* blue */
-  color: #F9FAFB;
-  border-color: #60A5FA;
-  box-shadow: 0 6px 14px rgba(37,99,235,0.6);
-}
+      /* --- TAB 1: Ct Precision (BLUE) --- */
+      .outer-navigation .nav-pills > li:nth-child(1) > a.active,
+      .outer-navigation .nav-pills > li:nth-child(1) > a.active:focus,
+      .outer-navigation .nav-pills > li:nth-child(1) > a.active:hover {
+        background-color: #2563EB !important; /* BLUE */
+        color: #FFFFFF !important;
+        border-color: #3B82F6 !important;
+        box-shadow: 0 0 15px rgba(37, 99, 235, 0.6);
+      }
 
-/* Tab 2 active: LOD (orange pill) */
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(2).active > a,
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(2).active > a:focus,
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(2).active > a:hover {
-  background-color: #EA580C;   /* orange */
-  color: #FFF7ED;
-  border-color: #FDBA74;
-  box-shadow: 0 6px 14px rgba(234,88,12,0.6);
-}
+      /* --- TAB 2: LOD Estimation (ORANGE) --- */
+      .outer-navigation .nav-pills > li:nth-child(2) > a.active,
+      .outer-navigation .nav-pills > li:nth-child(2) > a.active:focus,
+      .outer-navigation .nav-pills > li:nth-child(2) > a.active:hover {
+        background-color: #EA580C !important; /* ORANGE */
+        color: #FFFFFF !important;
+        border-color: #F97316 !important;
+        box-shadow: 0 0 15px rgba(234, 88, 12, 0.6);
+      }
 
-/* Tab 3 active: Diagnostic 2×2 (teal pill) */
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a,
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:focus,
-ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
-  background-color: #0D9488;   /* teal */
-  color: #ECFEFF;
-  border-color: #5EEAD4;
-  box-shadow: 0 6px 14px rgba(13,148,136,0.6);
-}
+      /* --- TAB 3: Diagnostic 2x2 (TEAL) --- */
+      .outer-navigation .nav-pills > li:nth-child(3) > a.active,
+      .outer-navigation .nav-pills > li:nth-child(3) > a.active:focus,
+      .outer-navigation .nav-pills > li:nth-child(3) > a.active:hover {
+        background-color: #0D9488 !important; /* TEAL */
+        color: #FFFFFF !important;
+        border-color: #14B8A6 !important;
+        box-shadow: 0 0 15px rgba(13, 148, 136, 0.6);
+      }
 
+      /* =====================================================
+         2. INNER TABS (INSIDE MODULES)
+         Specific IDs from Namespaces
+         ===================================================== */
 
-#main_tabs .nav-pills > li > a:hover {
-  background-color: #1F2937;
-  color: #F9FAFB;
-  border-color: #6B7280;
-}
-
-/* Tab 1: Ct Precision (blue) */
-#main_tabs .nav-pills > li:nth-child(1).active > a,
-#main_tabs .nav-pills > li:nth-child(1).active > a:focus,
-#main_tabs .nav-pills > li:nth-child(1).active > a:hover {
-  background-color: #2563EB;   /* blue */
-  color: #F9FAFB;
-  border-color: #60A5FA;
-  box-shadow: 0 6px 14px rgba(37,99,235,0.6);
-}
-
-/* Tab 2: LOD Estimation (orange) */
-#main_tabs .nav-pills > li:nth-child(2).active > a,
-#main_tabs .nav-pills > li:nth-child(2).active > a:focus,
-#main_tabs .nav-pills > li:nth-child(2).active > a:hover {
-  background-color: #EA580C;   /* orange */
-  color: #FFF7ED;
-  border-color: #FDBA74;
-  box-shadow: 0 6px 14px rgba(234,88,12,0.6);
-}
-
-/* Tab 3: Diagnostic 2x2 (teal) */
-#main_tabs .nav-pills > li:nth-child(3).active > a,
-#main_tabs .nav-pills > li:nth-child(3).active > a:focus,
-#main_tabs .nav-pills > li:nth-child(3).active > a:hover {
-  background-color: #0D9488;   /* teal */
-  color: #ECFEFF;
-  border-color: #5EEAD4;
-  box-shadow: 0 6px 14px rgba(13,148,136,0.6);
-}
-
-
-      /* ===========================
-         INNER TABS (within each app)
-         Slim, underlined style
-         =========================== */
-
-      /* Common base style for all inner tabsets */
+      /* Base style for inner tabs */
       #ct-ct_tabs .nav-pills > li > a,
       #lod-lod_tabs .nav-pills > li > a,
       #diag2-diag_tabs .nav-pills > li > a {
-        background-color: transparent;
-        color: #9CA3AF;
-        border-radius: 0;
-        border: none;
-        border-bottom: 2px solid transparent;
-        margin-right: 18px;
-        padding: 4px 2px 6px 2px;
-        font-weight: 400;
-        text-transform: none;
-        letter-spacing: 0.01em;
+        background-color: transparent !important;
+        color: #6B7280 !important;
+        border: none !important;
+        border-bottom: 3px solid transparent !important;
+        border-radius: 0 !important;
+        margin-right: 15px;
+        padding: 5px 10px;
+        font-weight: 500;
+        font-size: 1rem;
       }
 
+      /* Hover */
       #ct-ct_tabs .nav-pills > li > a:hover,
       #lod-lod_tabs .nav-pills > li > a:hover,
       #diag2-diag_tabs .nav-pills > li > a:hover {
-        color: #E5E7EB;
-        border-bottom-color: #4B5563;
-        background-color: transparent;
+        color: #E5E7EB !important;
+        background-color: rgba(255,255,255,0.05) !important;
       }
 
-      /* Ct app inner tabs: blue accent */
+      /* --- CT APP INNER TABS (BLUE) --- */
       #ct-ct_tabs .nav-pills > li.active > a,
-      #ct-ct_tabs .nav-pills > li.active > a:focus,
-      #ct-ct_tabs .nav-pills > li.active > a:hover {
-        background-color: transparent;
-        color: #BFDBFE;
-        border-bottom-color: #3B82F6;
-        font-weight: 500;
+      #ct-ct_tabs .nav-pills > li.active > a:focus {
+        color: #60A5FA !important; /* Light Blue Text */
+        border-bottom: 3px solid #3B82F6 !important; /* Blue Line */
+        background-color: transparent !important;
       }
 
-      /* LOD app inner tabs: orange accent */
+      /* --- LOD APP INNER TABS (ORANGE) --- */
       #lod-lod_tabs .nav-pills > li.active > a,
-      #lod-lod_tabs .nav-pills > li.active > a:focus,
-      #lod-lod_tabs .nav-pills > li.active > a:hover {
-        background-color: transparent;
-        color: #FED7AA;
-        border-bottom-color: #F97316;
-        font-weight: 500;
+      #lod-lod_tabs .nav-pills > li.active > a:focus {
+        color: #FB923C !important; /* Light Orange Text */
+        border-bottom: 3px solid #F97316 !important; /* Orange Line */
+        background-color: transparent !important;
       }
 
-      /* Diagnostic 2x2 inner tabs: teal accent */
+      /* --- DIAGNOSTIC APP INNER TABS (TEAL) --- */
       #diag2-diag_tabs .nav-pills > li.active > a,
-      #diag2-diag_tabs .nav-pills > li.active > a:focus,
-      #diag2-diag_tabs .nav-pills > li.active > a:hover {
-        background-color: transparent;
-        color: #A7F3D0;
-        border-bottom-color: #14B8A6;
-        font-weight: 500;
+      #diag2-diag_tabs .nav-pills > li.active > a:focus {
+        color: #5EEAD4 !important; /* Light Teal Text */
+        border-bottom: 3px solid #14B8A6 !important; /* Teal Line */
+        background-color: transparent !important;
       }
 
-      /* ===========================
-         Side panels styling
-         =========================== */
-
+      /* =====================================================
+         3. PANELS & CARDS
+         ===================================================== */
       .ct-panel .well {
-        border-left: 5px solid #3B82F6;
-        background-color: #020617;
-        border-radius: 10px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.6);
-        border: 1px solid #1F2937;
+        border-left: 4px solid #3B82F6;
+        background-color: #111827;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
       }
-      .ct-panel h4 {
-        color: #60A5FA;
-        font-weight: 600;
-        margin-top: 0;
-      }
+      .ct-panel h4 { color: #60A5FA; }
 
       .lod-panel .well {
-        border-left: 5px solid #F97316;
-        background-color: #020617;
-        border-radius: 10px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.6);
-        border: 1px solid #1F2937;
+        border-left: 4px solid #F97316;
+        background-color: #111827;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
       }
-      .lod-panel h4 {
-        color: #FB923C;
-        font-weight: 600;
-        margin-top: 0;
-      }
+      .lod-panel h4 { color: #FB923C; }
 
-      .ct-panel .form-group label,
-      .lod-panel .form-group label {
-        font-weight: 500;
-        color: #E5E7EB;
-      }
-
-      /* ===========================
-         Hero cards on top
-         =========================== */
       .hero-card {
         border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.7);
-        border: 1px solid #1F2937;
-        background: radial-gradient(circle at top left, #111827, #020617);
-        color: #E5E7EB;
+        border: 1px solid #374151;
+        background: linear-gradient(145deg, #1F2937, #111827);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
       }
-      .hero-card h4 {
-        margin-top: 0;
-        margin-bottom: 6px;
-        font-weight: 600;
-      }
-      .hero-icon {
-        margin-right: 8px;
-      }
-      .hero-card p {
-        color: #9CA3AF;
-      }
-
-
-      /* ===========================
-         Hero cards as app navigation
-         =========================== */
-      .hero-card.clickable {
-        cursor: pointer;
-        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
-      }
-      .hero-card.clickable:hover {
-        transform: translateY(-2px);
-        border-color: #6B7280;
-      }
-      .hero-card.active {
-        border-color: #93C5FD;
-      }
-      #hero_ct.active {
-        box-shadow: 0 0 0 1px rgba(59,130,246,0.35), 0 10px 22px rgba(37,99,235,0.25);
-      }
-      #hero_lod.active {
-        box-shadow: 0 0 0 1px rgba(249,115,22,0.35), 0 10px 22px rgba(234,88,12,0.25);
-      }
-      #hero_diag2.active {
-        box-shadow: 0 0 0 1px rgba(20,184,166,0.35), 0 10px 22px rgba(13,148,136,0.25);
-      }
-
-      /* ===========================
-         Plots & text colors
-         =========================== */
-      .hero-card,
-      .well {
-        color: #E5E7EB;
-      }
-
-      /* ===========================
-         DataTables / table styling
-         =========================== */
-      table.dataTable {
-        color: #E5E7EB !important;
-      }
-      .dataTables_wrapper .dataTables_length,
-      .dataTables_wrapper .dataTables_filter,
-      .dataTables_wrapper .dataTables_info,
-      .dataTables_wrapper .dataTables_processing,
+      .hero-icon { margin-right: 8px; opacity: 0.8; }
+      
+      .dataTables_wrapper .dataTables_length, 
+      .dataTables_wrapper .dataTables_filter, 
+      .dataTables_wrapper .dataTables_info, 
       .dataTables_wrapper .dataTables_paginate {
         color: #9CA3AF !important;
       }
-  ")),
-
-    tags$script(HTML("  (function(){    function setActive(id){      $('#hero_ct, #hero_lod, #hero_diag2').removeClass('active');      $(id).addClass('active');    }    $(document).on('click', '#hero_ct', function(){      setActive('#hero_ct');      Shiny.setInputValue('app_choice', 'ct', {priority: 'event'});    });    $(document).on('click', '#hero_lod', function(){      setActive('#hero_lod');      Shiny.setInputValue('app_choice', 'lod', {priority: 'event'});    });    $(document).on('click', '#hero_diag2', function(){      setActive('#hero_diag2');      Shiny.setInputValue('app_choice', 'diag2', {priority: 'event'});    });    $(document).on('shiny:connected', function(){      setActive('#hero_ct');    });  })();"))
+      table.dataTable tbody tr { background-color: transparent !important; }
+    "))
   ),
   
   
   titlePanel(
     div(
       style = "display:flex; align-items:center; gap:20px;",
-      # img(
-      #   src   = "PHO.png",
-      #   height = 96,
-      #   width  = 288,
-      #   style  = "flex-shrink:0; margin-right:10px;"
-      # ),
       h2("Ct Precision & LOD Tool",
          style = "margin-bottom:0; font-weight:600; color:#F9FAFB;")
     ),
@@ -1837,53 +1708,56 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
     column(
       4,
       wellPanel(
-        id = "hero_ct",
-        class = "hero-card hero-ct clickable",
+        class = "hero-card",
         h4(
           span(icon("vial", class = "hero-icon")),
           "Ct regression & variance"
         ),
         p(
-          "Model Ct as a continuous outcome; decompose measurement variability into within- and between-experiment SD; ",
-          "compare mixed-model and ANOVA-based variance components."
+          "Model Ct as a continuous outcome; decompose measurement variability into within- and between-experiment SD."
         )
       )
     ),
     column(
       4,
       wellPanel(
-        id = "hero_lod",
-        class = "hero-card hero-lod clickable",
+        class = "hero-card",
         h4(
           span(icon("bullseye", class = "hero-icon")),
           "Probit LOD (binary detection)"
         ),
         p(
-          "Fit probit dose–response models for detection/non-detection by dilution; ",
-          "estimate LOD at chosen detection probabilities on both dilution and copy-number scales."
+          "Fit probit dose–response models for detection/non-detection by dilution."
         )
       )
     ),
     column(
       4,
       wellPanel(
-        id = "hero_diag2",
-        class = "hero-card hero-diag2 clickable",
+        class = "hero-card",
         h4(
           span(icon("table", class = "hero-icon")),
           "Diagnostic 2×2"
         ),
         p(
-          "Summarize 2×2 diagnostic test data (TP, FP, TN, FN); ",
-          "compute prevalence, sensitivity, specificity, predictive values, and likelihood ratios ",
-          "with exact binomial confidence intervals."
+          "Summarize 2×2 diagnostic test data (TP, FP, TN, FN) and compute sensitivity, specificity, etc."
         )
       )
     )
   ),
   br(),
-
-  uiOutput("selected_app_ui"),
+  
+  # --- WRAPPER ADDED HERE FOR CSS TARGETING ---
+  div(
+    class = "outer-navigation",
+    tabsetPanel(
+      type = "pills",
+      id   = "main_tabs",
+      tabPanel("Ct Precision (continuous)", ctAppUI("ct")),
+      tabPanel("LOD Estimation (binary)",   lodAppUI("lod")),
+      tabPanel("Diagnostic 2×2",            diag2x2UI("diag2"))
+    )
+  ),
   
   tags$hr(style="border-color:#1F2937;"),
   div(
@@ -1894,23 +1768,6 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
 )
 
 server <- function(input, output, session) {
-  selected_app <- reactiveVal("ct")
-
-  observeEvent(input$app_choice, {
-    req(input$app_choice)
-    selected_app(as.character(input$app_choice))
-  }, ignoreInit = TRUE)
-
-  output$selected_app_ui <- renderUI({
-    switch(
-      selected_app(),
-      ct    = ctAppUI("ct"),
-      lod   = lodAppUI("lod"),
-      diag2 = diag2x2UI("diag2"),
-      ctAppUI("ct")
-    )
-  })
-
   ctAppServer("ct")
   lodAppServer("lod")
   diag2x2Server("diag2")

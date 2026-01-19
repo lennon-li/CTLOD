@@ -12,6 +12,8 @@ library(rlang)
 library(glmmTMB)
 library(dplyr)
 library(tidyr)
+library(officer)
+library(flextable)
 
 brglmControl(maxit = 5000)
 

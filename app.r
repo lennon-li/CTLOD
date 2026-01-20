@@ -458,9 +458,9 @@ diag2x2Server <- function(id) {
     
     observeEvent(input$reset, {
       updateNumericInput(session, "fp", value = 0)
-      updateNumericInput(session, "tp", value = 23)
-      updateNumericInput(session, "tn", value = 92)
-      updateNumericInput(session, "fn", value = 1)
+      updateNumericInput(session, "tp", value = 0)
+      updateNumericInput(session, "tn", value = 0)
+      updateNumericInput(session, "fn", value = 0)
     })
     
     stats_list <- eventReactive(input$calc, ignoreNULL = FALSE, {
@@ -552,6 +552,7 @@ diag2x2Server <- function(id) {
         }
       })
       rownames(df) <- rn
+      names(df) <- c("Estimate", "Lower 95% CI", "Upper 95% CI")
       df
     }
     

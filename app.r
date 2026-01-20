@@ -19,6 +19,88 @@ brglmControl(maxit = 5000)
 
 ## ---------- Shared helper functions for Ct app ----------------------
 
+
+.read_counts <- function(path) {
+  if (!file.exists(path)) return(setNames(integer(), character()))
+  x <- tryCatch(readRDS(path), error = function(e) NULL)
+  if (is.null(x)) return(setNames(integer(), character()))
+  if (is.list(x) && !is.null(names(x))) x <- unlist(x)
+  x <- suppressWarnings(as.integer(x))
+  if (is.null(names(x))) names(x) <- character(length(x))
+  x[is.na(x)] <- 0L
+  x
+}
+
+.write_counts <- function(path, counts) {
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+  tmp <- paste0(path, ".tmp_", Sys.getpid(), "_", as.integer(Sys.time()))
+  saveRDS(counts, tmp)
+  ok <- file.rename(tmp, path)
+  if (!isTRUE(ok)) {
+    tryCatch({ saveRDS(counts, path) }, error = function(e) NULL)
+    if (file.exists(tmp)) unlink(tmp)
+  }
+  invisible(counts)
+}
+
+.inc_key <- function(path, key) {
+  counts <- .read_counts(path)
+  if (!key %in% names(counts)) counts[key] <- 0L
+  counts[key] <- counts[key] + 1L
+  .write_counts(path, counts)
+  counts[key]
+}
+
+.pick_counter_path <- function(filename = "site_visits.rds") {
+  # 1) app working directory (if writable)
+  # 2) HOME (often persistent on Posit)
+  # 3) tempdir() (resets when process restarts)
+  dirs <- unique(c(getwd(), Sys.getenv("HOME", unset = ""), tempdir()))
+  dirs <- dirs[nzchar(dirs)]
+  
+  for (d in dirs) {
+    ok <- tryCatch({
+      dir.create(d, showWarnings = FALSE, recursive = TRUE)
+      tf <- file.path(d, paste0(".__writetest__", Sys.getpid()))
+      writeLines("x", tf)
+      unlink(tf)
+      TRUE
+    }, error = function(e) FALSE)
+    
+    if (isTRUE(ok)) return(file.path(d, filename))
+  }
+  
+  file.path(tempdir(), filename)
+}
+
+.read_counter <- function(path) {
+  if (!file.exists(path)) return(0L)
+  x <- tryCatch(readRDS(path), error = function(e) 0L)
+  x <- suppressWarnings(as.integer(x))
+  if (length(x) != 1 || is.na(x) || x < 0) 0L else x
+}
+
+.write_counter <- function(path, value) {
+  value <- suppressWarnings(as.integer(value))
+  if (length(value) != 1 || is.na(value) || value < 0) value <- 0L
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+  tmp <- paste0(path, ".tmp_", Sys.getpid(), "_", as.integer(Sys.time()))
+  saveRDS(value, tmp)
+  ok <- file.rename(tmp, path)
+  if (!isTRUE(ok)) {
+    tryCatch({ saveRDS(value, path) }, error = function(e) NULL)
+    if (file.exists(tmp)) unlink(tmp)
+  }
+  invisible(value)
+}
+
+.increment_counter <- function(path) {
+  n <- .read_counter(path)
+  n2 <- n + 1L
+  .write_counter(path, n2)
+  n2
+}
+
 shapeWide <- function(df) {
   df %>%
     mutate(across(everything(), ~ suppressWarnings(as.numeric(.)))) %>%
@@ -2006,12 +2088,62 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
   div(
     style = "font-size:0.85em; color:#6B7280; text-align:right; margin-top:5px;",
     "Version 1.0 • For questions, contact: ",
-    tags$a("Lennon Li", href = "mailto:lennon.li@oahpp.ca")
+    tags$a("Lennon Li", href = "mailto:lennon.li@oahpp.ca"),
+    uiOutput("site_visits_inline")
+    #uiOutput("switch_counts_inline")
   )
 )
 
 server <- function(input, output, session) {
   selected_app <- reactiveVal("ct")
+  
+  counter_path <- .pick_counter_path("site_counts.rds")
+  
+  # Count top-level app switching (clickable hero)
+  observeEvent(input$app_choice, {
+    .inc_key(counter_path, paste0("app:", input$app_choice))
+    .inc_key(counter_path, "app_switch_total")
+  }, ignoreInit = TRUE)
+  
+  # Count inner tab switching (replace IDs if yours differ)
+  observeEvent(input$ct_tabs, {
+    .inc_key(counter_path, paste0("ct_tab:", input$ct_tabs))
+    .inc_key(counter_path, "ct_tab_switch_total")
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$lod_tabs, {
+    .inc_key(counter_path, paste0("lod_tab:", input$lod_tabs))
+    .inc_key(counter_path, "lod_tab_switch_total")
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$diag_tabs, {
+    .inc_key(counter_path, paste0("diag_tab:", input$diag_tabs))
+    .inc_key(counter_path, "diag_tab_switch_total")
+  }, ignoreInit = TRUE)
+  
+  site_visits <- reactiveVal(NA_integer_)
+  counter_path <- .pick_counter_path("site_visits.rds")
+  
+  did_inc <- reactiveVal(FALSE)
+  observe({
+    if (isTRUE(did_inc())) return()
+    did_inc(TRUE)
+    site_visits(.increment_counter(counter_path))
+  })
+  
+  output$site_visits_inline <- renderUI({
+    n <- site_visits()
+    if (is.null(n) || is.na(n)) return(NULL)
+    tags$span(style = "margin-left:10px;",
+              paste0("• Visits: ", format(n, big.mark = ",")))
+  })
+  
+  output$switch_counts_inline <- renderUI({
+    counts <- .read_counts(counter_path)
+    total <- unname(counts["app_switch_total"])
+    if (is.na(total) || length(total) == 0) total <- 0L
+    tags$span(style="margin-left:10px;", paste0("• Tab switches: ", format(total, big.mark=",")))
+  })
   
   observeEvent(input$app_choice, {
     req(input$app_choice)

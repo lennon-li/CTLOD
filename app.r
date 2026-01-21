@@ -19,6 +19,39 @@ brglmControl(maxit = 5000)
 
 ## ---------- Shared helper functions for Ct app ----------------------
 
+# ---- Visits counter saved to ./data/site_visits.rds ----
+.visits_path <- function() {
+  dir.create("data", showWarnings = FALSE, recursive = TRUE)
+  file.path("data", "site_visits.rds")
+}
+
+.read_visits <- function(path) {
+  if (!file.exists(path)) return(0L)
+  x <- tryCatch(readRDS(path), error = function(e) 0L)
+  x <- suppressWarnings(as.integer(x))
+  if (length(x) != 1L || is.na(x) || x < 0L) 0L else x
+}
+
+.write_visits <- function(path, value) {
+  value <- suppressWarnings(as.integer(value))
+  if (length(value) != 1L || is.na(value) || value < 0L) value <- 0L
+  
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+  tmp <- paste0(path, ".tmp_", Sys.getpid(), "_", as.integer(Sys.time()))
+  saveRDS(value, tmp)
+  if (!file.rename(tmp, path)) {
+    tryCatch(saveRDS(value, path), error = function(e) NULL)
+    if (file.exists(tmp)) unlink(tmp)
+  }
+  invisible(value)
+}
+
+.increment_visits <- function(path) {
+  n <- .read_visits(path) + 1L
+  .write_visits(path, n)
+  n
+}
+
 
 .read_counts <- function(path) {
   if (!file.exists(path)) return(setNames(integer(), character()))
@@ -2096,6 +2129,25 @@ ul.nav[data-tabsetid='main_tabs'] > li:nth-child(3).active > a:hover {
 
 server <- function(input, output, session) {
   selected_app <- reactiveVal("ct")
+  
+  visits_path <- .visits_path()
+  
+  site_visits <- reactiveVal(NA_integer_)
+  did_inc <- reactiveVal(FALSE)
+  
+  observe({
+    if (isTRUE(did_inc())) return()
+    did_inc(TRUE)
+    site_visits(.increment_visits(visits_path))
+  })
+  
+  output$site_visits_inline <- renderUI({
+    n <- site_visits()
+    if (is.null(n) || is.na(n)) return(NULL)
+    tags$span(style = "margin-left:10px;",
+              paste0("• Visits: ", format(n, big.mark = ",")))
+  })
+  
   
   counter_path <- .pick_counter_path("site_counts.rds")
   
